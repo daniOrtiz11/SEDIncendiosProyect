@@ -3,7 +3,7 @@ var client  = mqtt.connect('mqtt://test.mosquitto.org')
  
 client.on('connect', function () {
   client.subscribe('presence')
-  client.publish('presence', 'Hello mqtt')
+  client.publish('presence', 'hi')
 })
  
 client.on('message', function (topic, message) {
