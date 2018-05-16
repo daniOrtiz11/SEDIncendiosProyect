@@ -1,23 +1,3 @@
-/*
- Basic ESP8266 MQTT example
- This sketch demonstrates the capabilities of the pubsub library in combination
- with the ESP8266 board/library.
- It connects to an MQTT server then:
-  - publishes "hello world" to the topic "outTopic" every two seconds
-  - subscribes to the topic "inTopic", printing out any messages
-    it receives. NB - it assumes the received payloads are strings not binary
-  - If the first character of the topic "inTopic" is an 1, switch ON the ESP Led,
-    else switch it off
- It will reconnect to the server if the connection is lost using a blocking
- reconnect function. See the 'mqtt_reconnect_nonblocking' example for how to
- achieve the same result without blocking the main loop.
- To install the ESP8266 board, (using Arduino 1.6.4+):
-  - Add the following 3rd party board manager under "File -> Preferences -> Additional Boards Manager URLs":
-       http://arduino.esp8266.com/stable/package_esp8266com_index.json
-  - Open the "Tools -> Board -> Board Manager" and click install for the ESP8266"
-  - Select your ESP8266 in "Tools -> Board"
-*/
-
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "DHT.h"
@@ -26,45 +6,61 @@
 #define DHTTYPE DHT22
 #define BUILTIN_LED D4
 
-// Update these with values suitable for your network.
 DHT dht(DHTPIN, DHTTYPE);
 
-const char* ssid = "PRIMA'S WIFI";
-const char* password = "Pr1m@s15072016";
+const char* ssid = "";
+const char* password = "";
+
 const char* mqtt_server = "test.mosquitto.org";
+
+const char* topic_subscribe = "bot_orders"
+const char* topic_publish = "dht_values"
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
 long lastMsg = 0;
 char msg[50];
 int value = 0;
 
+int highTemp = 70;
+int medTemp = 50;
+int lowTemp = 30;
+
+int highHum = 70;
+int medHum = 50;
+int lowHum = 30;
+
+
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-  Serial.begin(115200);
-  digitalWrite(BUILTIN_LED, HIGH);
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-  dht.begin();
+  pinMode(BUILTIN_LED, OUTPUT); //inicializacion del primer led
+  pinMode(2, OUTPUT); // inicializacion del segundo led
+  
+  Serial.begin(115200); //baud rate
+  digitalWrite(BUILTIN_LED, LOW); // se apaga el led
+  digitalWrite(2, LOW); //se apaga el led
+  
+  setup_wifi(); //conexion del wifi
+  client.setServer(mqtt_server, 1883); //servidor mqtt y puerto
+  client.setCallback(callback); //funcion de callback para cuando se reciba un mensaje
+  
+  dht.begin(); //se inician los sensores
 }
 
 void setup_wifi() {
 
   delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  
+  Serial.println(ssid); //muestra la red a la que se quiere conectar
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password); //red y password
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED) { 
     delay(500);
     Serial.print(".");
   }
 
-  Serial.println("");
+  Serial.println(""); 
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
@@ -80,28 +76,33 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println();
 
   // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+  if ((String)payload[0] == 'led1on') {
+    digitalWrite(2, LOW);  // se enciende con LOW
+  }
+  if ((String)payload[0] == 'led2on') {
+    digitalWrite(BUILTIN_LED, LOW);  // se enciende con LOW
+  }
+
+  if ((String)payload[0]=='led1off'){
+    digitalWrite(2, HIGH); // se apaga con high
+  }
+
+  if ((String)payload[0]=='led2off'){
+    digitalWrite(BUILTINLED, HIGH); // se apaga con high
   }
 
 }
 
 void reconnect() {
-  // Loop until we're reconnected
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    if (client.connect("ESP8266Client")) {
-      Serial.println("connected");
-      // Once connected, publish an announcement...
-      client.publish("presence", "hello world");
-      // ... and resubscribe
-      client.subscribe("Topic1");
-    } else {
-      Serial.print("failed, rc=");
+    Serial.print("Intento de conexión MQTT");
+    if (client.connect("ESP8266Client")) { //si se ha conseguido conectar a MQTT
+      Serial.println("conectado"); //informa de que se ha podido conectar
+      client.publish(topic_publish, "conectado"); // publica en 'topic_publish' (definido arriba) que se ha conectado
+      client.subscribe(topic_subscribe); // se suscribe 'topic_subscribe' (definido arriba)
+    } else { // no ha coneguido conectarse a MQTT, informa del fallo
+      Serial.print("Fallo, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
       delay(5000);
     }
   }
@@ -129,9 +130,9 @@ void loop() {
   float hic = dht.computeHeatIndex(t, h, false);
 
   snprintf(msg, 75, "Humedad: %f", h);
-  client.publish("presence", msg);
+  client.publish(topic_publish, msg);
   snprintf(msg, 75, "Temperatura ºC: %f", t);
-  client.publish("presence", msg);
+  client.publish(topic_publish, msg);
   snprintf(msg, 75, "Heat index ºC: %f", hic);
 
   if(h>80){
