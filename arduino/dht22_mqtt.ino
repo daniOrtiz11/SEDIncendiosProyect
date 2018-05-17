@@ -4,17 +4,18 @@
 
 #define DHTPIN D2
 #define DHTTYPE DHT22
-#define BUILTIN_LED D4
+
+#define LED D4
 
 DHT dht(DHTPIN, DHTTYPE);
 
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "PRIMA'S WIFI";
+const char* password = "Pr1m@s15072016";
 
 const char* mqtt_server = "test.mosquitto.org";
 
-const char* topic_subscribe = "bot_orders"
-const char* topic_publish = "dht_values"
+const char* topic_subscribe = "bot_orders";
+const char* topic_publish = "dht_values";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -23,22 +24,15 @@ long lastMsg = 0;
 char msg[50];
 int value = 0;
 
-int highTemp = 70;
-int medTemp = 50;
-int lowTemp = 30;
-
-int highHum = 70;
-int medHum = 50;
-int lowHum = 30;
+int hum_limit = 50;
+int temp_limit = 30;
 
 
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT); //inicializacion del primer led
-  pinMode(2, OUTPUT); // inicializacion del segundo led
+  pinMode(LED, OUTPUT); //inicializacion del led
   
   Serial.begin(115200); //baud rate
-  digitalWrite(BUILTIN_LED, LOW); // se apaga el led
-  digitalWrite(2, LOW); //se apaga el led
+  digitalWrite(LED, HIGH); // se apaga el led
   
   setup_wifi(); //conexion del wifi
   client.setServer(mqtt_server, 1883); //servidor mqtt y puerto
@@ -70,27 +64,51 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
+  char rcv[50];
+  int len;
   for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+    char a = (char)payload[i];
+    Serial.print(a);
+    rcv[i] = a;
+    len++; 
   }
   Serial.println();
 
-  // Switch on the LED if an 1 was received as first character
-  if ((String)payload[0] == 'led1on') {
-    digitalWrite(2, LOW);  // se enciende con LOW
-  }
-  if ((String)payload[0] == 'led2on') {
-    digitalWrite(BUILTIN_LED, LOW);  // se enciende con LOW
+  if (iguales(rcv, "led_on", length)) {
+    digitalWrite(LED, LOW);  // se enciende con LOW
   }
 
-  if ((String)payload[0]=='led1off'){
-    digitalWrite(2, HIGH); // se apaga con high
+  if (iguales(rcv, "led_off", length)){
+    digitalWrite(LED, HIGH); // se apaga con high
   }
 
-  if ((String)payload[0]=='led2off'){
-    digitalWrite(BUILTINLED, HIGH); // se apaga con high
+  if (iguales(rcv, "hum", 3)){
+     String lim = "";
+     for(int i = 5; i < length; i++){
+      lim = String(lim + rcv[i]);
+     }
+     hum_limit = lim.toInt();
+     Serial.print(lim);
+     //snprintf(msg, 75, "Limite de humedad configurado: %f", hum_limit);
+     client.publish(topic_publish, msg);
   }
+  if (iguales(rcv, "temp", 4)){
+     String lim = "";
+     for(int i = 6; i < length; i++){
+      lim = String(lim + rcv[i]);
+     }
+     temp_limit = lim.toInt();
+     snprintf(msg, 75, "Limite de temperatura configurado: %f", temp_limit);
+     client.publish(topic_publish, msg);
+  }
+}
 
+bool iguales(char* str1, char* str2, int len){
+  for (int i = 0; i < len; i++){
+    if (str1[i] != str2[i])
+      return false;
+  }
+  return true;
 }
 
 void reconnect() {
@@ -134,8 +152,9 @@ void loop() {
   snprintf(msg, 75, "Temperatura ºC: %f", t);
   client.publish(topic_publish, msg);
   snprintf(msg, 75, "Heat index ºC: %f", hic);
+  client.publish(topic_publish, msg);
 
-  if(h>80){
-    digitalWrite(BUILTIN_LED, LOW);
+  if(h > hum_limit || t > temp_limit){
+    digitalWrite(LED, LOW);
   }
 }
