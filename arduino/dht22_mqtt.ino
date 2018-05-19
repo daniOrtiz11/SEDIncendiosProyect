@@ -1,3 +1,12 @@
+/*
+ * Comandos que reconoce mqtt como strings:
+- led_on - enciende el led del arduino
+- led_off - apaga el led del arduino
+- hum: 30 - configura el limite de la humedad para que se encienda el led a 30, se puede poner el numero entero que se quiera (esta hecho para ponerlo asi, 
+  con un espacio detras de los dos puntos y ningun espacio antes de hum ni despues del valor)
+- temp: 50 - configura el limite de la temperatura a 50 de forma similar a la humedad
+*/
+
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "DHT.h"
@@ -9,10 +18,10 @@
 
 DHT dht(DHTPIN, DHTTYPE);
 
-const char* ssid = "PRIMA'S WIFI";
-const char* password = "Pr1m@s15072016";
+const char* ssid = "";
+const char* password = "";
 
-const char* mqtt_server = "test.mosquitto.org";
+const char* mqtt_server = "192.168.1.11";
 
 const char* topic_subscribe = "bot_orders";
 const char* topic_publish = "dht_values";
@@ -83,7 +92,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   if (iguales(rcv, "hum", 3)){
-     int hum_limit = 0;
+     hum_limit = 0;
      for(int i = 5; i < length; i++){
       hum_limit = hum_limit*10 + entero(rcv[i]);
      }
@@ -91,7 +100,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
      client.publish(topic_publish, msg);
   }
   if (iguales(rcv, "temp", 4)){
-     int temp_limit = 0;
+     temp_limit = 0;
      for(int i = 6; i < length; i++){
       temp_limit = temp_limit*10 + entero(rcv[i]);
      }
