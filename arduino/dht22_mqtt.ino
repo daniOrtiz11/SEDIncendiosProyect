@@ -5,6 +5,8 @@
 - hum: 30 - configura el limite de la humedad para que se encienda el led a 30, se puede poner el numero entero que se quiera (esta hecho para ponerlo asi, 
   con un espacio detras de los dos puntos y ningun espacio antes de hum ni despues del valor)
 - temp: 50 - configura el limite de la temperatura a 50 de forma similar a la humedad
+- 2d humedad - comando para pedir la humedad por el canal del segundo bot
+- 2d temperatura - comando para pedir la temperatura por el canal del segundo bot
 */
 
 #include <ESP8266WiFi.h>
@@ -36,6 +38,8 @@ int value = 0;
 int hum_limit = 50;
 int temp_limit = 30;
 
+bool temp_enviar = false;
+bool hum_enviar = false;
 
 void setup() {
   pinMode(LED, OUTPUT); //inicializacion del led
@@ -107,6 +111,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
      snprintf(msg, 75, "Limite de temperatura configurado: %i", temp_limit);
      client.publish(topic_publish, msg);
   }
+
+  if (iguales(rcv, "2d temperatura", 14)){
+      temp_enviar = true;
+  }
+  
+  if (iguales(rcv, "2d humedad", 10)){
+      hum_enviar = true;
+  }
 }
 
 bool iguales(char* str1, char* str2, int len){
@@ -155,10 +167,39 @@ void loop() {
   client.loop();
 
   delay(2000);
+  unsigned long init_time = millis();
+  unsigned long new_time = millis();
 
-  float h = dht.readHumidity();
+  float t;
+  float h;
+  
+  for (int i = 0; i < 2; i++){
+    if(temp_enviar){
+      t = dht.readTemperature();
+      if (isnan(t)) {
+        Serial.println("Failed to read from DHT sensor!");
+        return;
+      }
+      snprintf(msg, 75, "2d Temperatura pedida ºC: %f", t);
+      client.publish(topic_publish, msg);
+      temp_enviar = false;
+    }
+    if(hum_enviar){
+      h = dht.readHumidity();
+      if (isnan(h)) {
+        Serial.println("Failed to read from DHT sensor!");
+        return;
+      }
+      snprintf(msg, 75, "2d Humedad pedida ºC: %f", h);
+      client.publish(topic_publish, msg);
+      hum_enviar = false;
+    }
+    delay(1000);
+  }
+  
+  h = dht.readHumidity();
   // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
+  t = dht.readTemperature();
 
   // Check if any reads failed and exit early (to try again).
   if (isnan(h) || isnan(t)) {
@@ -166,16 +207,12 @@ void loop() {
     return;
   }
 
-  // Compute heat index in Celsius (isFahreheit = false)
-  float hic = dht.computeHeatIndex(t, h, false);
-
-  snprintf(msg, 75, "Humedad: %f", h);
+  snprintf(msg, 75, "2d Humedad: %f", h);
   client.publish(topic_publish, msg);
-  snprintf(msg, 75, "Temperatura ºC: %f", t);
+  snprintf(msg, 75, "2d Temperatura ºC: %f", t);
   client.publish(topic_publish, msg);
-  snprintf(msg, 75, "Heat index ºC: %f", hic);
-  client.publish(topic_publish, msg);
-
+  init_time = millis();
+    
   if(h > hum_limit || t > temp_limit){
     digitalWrite(LED, LOW);
   }
