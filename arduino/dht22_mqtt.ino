@@ -83,22 +83,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   if (iguales(rcv, "hum", 3)){
-     String lim = "";
+     int hum_limit = 0;
      for(int i = 5; i < length; i++){
-      lim = String(lim + rcv[i]);
+      hum_limit = hum_limit*10 + entero(rcv[i]);
      }
-     hum_limit = lim.toInt();
-     Serial.print(lim);
-     //snprintf(msg, 75, "Limite de humedad configurado: %f", hum_limit);
+     snprintf(msg, 75, "Limite de humedad configurado: %i", hum_limit);
      client.publish(topic_publish, msg);
   }
   if (iguales(rcv, "temp", 4)){
-     String lim = "";
+     int temp_limit = 0;
      for(int i = 6; i < length; i++){
-      lim = String(lim + rcv[i]);
+      temp_limit = temp_limit*10 + entero(rcv[i]);
      }
-     temp_limit = lim.toInt();
-     snprintf(msg, 75, "Limite de temperatura configurado: %f", temp_limit);
+     snprintf(msg, 75, "Limite de temperatura configurado: %i", temp_limit);
      client.publish(topic_publish, msg);
   }
 }
@@ -109,6 +106,22 @@ bool iguales(char* str1, char* str2, int len){
       return false;
   }
   return true;
+}
+
+int entero(char a){
+  switch(a){
+  case '0': return 0;
+  case '1': return 1;
+  case '2': return 2;
+  case '3': return 3;
+  case '4': return 4;
+  case '5': return 5;
+  case '6': return 6;
+  case '7': return 7;
+  case '8': return 8;
+  case '9': return 9;
+  default: return 0;
+  }
 }
 
 void reconnect() {
