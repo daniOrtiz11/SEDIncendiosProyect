@@ -26,7 +26,7 @@ const char* password = "";
 const char* mqtt_server = "192.168.1.11";
 
 const char* topic_subscribe = "bot_orders";
-const char* topic_publish = "dht_values";
+const char* topic_publish = "dht_values2";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -36,10 +36,13 @@ char msg[50];
 int value = 0;
 
 int hum_limit = 50;
-int temp_limit = 30;
+int temp_limit = 40;
 
 bool temp_enviar = false;
 bool hum_enviar = false;
+
+bool hum_encendido = false;
+bool temp_encendido = false;
 
 void setup() {
   pinMode(LED, OUTPUT); //inicializacion del led
@@ -180,7 +183,7 @@ void loop() {
         Serial.println("Failed to read from DHT sensor!");
         return;
       }
-      snprintf(msg, 75, "2d Temperatura pedida ºC: %f", t);
+      snprintf(msg, 75, "2d Temperatura pedida: %f", t);
       client.publish(topic_publish, msg);
       temp_enviar = false;
     }
@@ -190,7 +193,7 @@ void loop() {
         Serial.println("Failed to read from DHT sensor!");
         return;
       }
-      snprintf(msg, 75, "2d Humedad pedida ºC: %f", h);
+      snprintf(msg, 75, "2d Humedad pedida: %f", h);
       client.publish(topic_publish, msg);
       hum_enviar = false;
     }
@@ -213,7 +216,20 @@ void loop() {
   client.publish(topic_publish, msg);
   init_time = millis();
     
-  if(h > hum_limit || t > temp_limit){
+  if((h > hum_limit && !(hum_encendido))){
     digitalWrite(LED, LOW);
+    hum_encendido = true;
+  }
+  if (t > temp_limit && !(temp_encendido)){
+    digitalWrite(LED,LOW);
+    temp_encendido = true;
+  }
+
+  if(t < temp_limit && temp_encendido){
+    temp_encendido = false;
+  }
+
+  if(h < hum_limit && hum_encendido){
+    hum_encendido = false;
   }
 }
