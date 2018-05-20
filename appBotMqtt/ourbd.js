@@ -49,6 +49,16 @@ var getIdTelegram = function getIdTelegram(id, callback){
 	});
 }
 
+var getIdsBD = function getIdsBD(callback){
+	connection.query('SELECT idTelegram FROM users', [],function(err, rows, fields){
+	   if (err){
+		   throw err;
+	   }else{
+		   callback(null, rows);
+	   }
+	});
+}
+
 
 //exports.consultaVueloByOrigenDestino=consultaVueloByOrigenDestino;
 exports.connection=connection;
@@ -56,3 +66,4 @@ exports.startConnection=startConnection;
 exports.insertarUsuarioBD=insertarUsuarioBD;
 exports.getIdTelegram=getIdTelegram;
 exports.userOn=userOn;
+exports.getIdsBD=getIdsBD;

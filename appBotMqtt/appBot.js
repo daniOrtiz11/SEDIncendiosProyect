@@ -1,7 +1,13 @@
 const TeleBot = require('telebot');
 var mqtt = require('mqtt');
 const bd = require('./ourbd');
-var client  = mqtt.connect('mqtt://test.mosquitto.org');
+var client  = mqtt.connect('mqtt://192.168.1.11:1883');
+//Temperatura en incendio: 37º a ras de suelo - 130º media altura
+var LimiteTemperatura = 50;
+//Normal entre 30 y 60;
+var LimiteHumedad = 70;
+var getTemperatura = false;
+var getHumedad = false;
 const bot = new TeleBot({
     token: '531123090:AAGM9crBR6MqgGcA0V4__VwTNjKdvckGzTs',
     usePlugins: ['askUser', 'commandButton','namedButtons'],
@@ -11,7 +17,16 @@ const bot = new TeleBot({
     }
 });
 
-var id;
+/* Comandos que reconoce mqtt como strings:
+- led_on - enciende el led del arduino
+- led_off - apaga el led del arduino
+- hum: 30 - configura el limite de la humedad para que se encienda el led a 30, se puede poner el numero entero que se quiera (esta hecho para ponerlo asi, 
+  con un espacio detras de los dos puntos y ningun espacio antes de hum ni despues del valor)
+- temp: 50 - configura el limite de la temperatura a 50 de forma similar a la humedad
+- 2d humedad - comando para pedir la humedad por el canal del segundo bot
+- 2d temperatura - comando para pedir la temperatura por el canal del segundo bot
+*/
+var ids = {};
 var isRunning = false;
 
 // Al enviar el mensaje desde Arduino, se indicará un ID de dispositivo, tanto en la Temperatura como en la Humedad.
@@ -19,36 +34,63 @@ client.on('message', function (topic, message) {
 	  // message is Buffer
 	  // Cada vez que llega la temperatura y la humedad.
 	  var mensaje = message.toString();
+        console.log(mensaje);
 	  var idDisp;
-	  if(!mensaje.indexOf('1d')) idDisp = 1;
-	  else if(!mensaje.indexOf('2d')) idDisp = 2;
-	  
-	  bd.getIdTelegram(idDisp,function(err, result){
-		  if(err){
-			console.log(err);
-		  } else {
-			  console.log(mensaje);
-			  if(mensaje.indexOf('Temperatura')){
-				var temperatura = mensaje.split(':')[1];
-				if(temperatura > 35.0){
-					bot.sendMessage('140760980', "Tiene un INCENDIO en su casa! Su temperatura es de: " + temperatura + "ºC");
-				}
-			  } else { //Humedad
-				var humedad = mensaje.split(':')[1];
-				if(humedad > 90.0){
-					bot.sendMessage('140760980', "Tiene una INUNDACIÓN en su casa! Su humedad es de: " + humedad);	
-				}
-			  }
-		  }
-	  });
-	  //idTel = idTel.idTelegram;
-	  //bot.sendMessage(id, message.toString())
-	  //client.end()
+	  if(!mensaje.indexOf('1d')){
+         idDisp = ids[0].idTelegram; 
+          if(!mensaje.indexOf("temperatura pedida") && getTemperatura == true){
+              var temperatura = mensaje.split(':')[1];
+              getTemperatura = false;
+              bot.sendMessage(idDisp, "Su temperatura es de: " + temperatura + "ºC");
+          }
+          if(!mensaje.indexOf("humedad pedida") && getHumedad == true){
+              var humedad = mensaje.split(':')[1];
+              getHumedad = false;
+              bbot.sendMessage(idDisp, "Su humedad es de: " + humedad + " %");
+          }
+          if(!mensaje.indexOf('Temperatura')){
+            var temperatura = mensaje.split(':')[1];
+            if(temperatura > LimiteTemperatura){
+                bot.sendMessage(idDisp, "Tiene un INCENDIO en su casa! Su temperatura es de: " + temperatura + "ºC");
+            }
+
+          } else { //Humedad
+            var humedad = mensaje.split(':')[1];
+            if(humedad > LimiteHumedad){
+                bot.sendMessage(idDisp, "Tiene una INUNDACIÓN en su casa! Su humedad es de: " + humedad + " %");	
+            }
+          }
+      } 
+	  else if(!mensaje.indexOf('2d')) {
+         idDisp = ids[1].idTelegram; 
+          if(!mensaje.indexOf("temperatura pedida") && getTemperatura == true){
+              var temperatura = mensaje.split(':')[1];
+              getTemperatura = false;
+              bot.sendMessage(idDisp, "La temperatura actual de su casa es de: " + temperatura + "ºC");
+          }
+          if(!mensaje.indexOf("humedad pedida") && getHumedad == true){
+              var humedad = mensaje.split(':')[1];
+              getHumedad = false;
+              bbot.sendMessage(idDisp, "La humedad actual de su casa es de: " + humedad + " %");
+          }
+          if(!mensaje.indexOf('Temperatura')){
+            var temperatura = mensaje.split(':')[1];
+            if(temperatura > LimiteTemperatura){
+                bot.sendMessage(idDisp, "Tiene un INCENDIO en su casa! Su temperatura es de: " + temperatura + "ºC");
+            }
+
+          } else { //Humedad
+            var humedad = mensaje.split(':')[1];
+            if(humedad > LimiteHumedad){
+                bot.sendMessage(idDisp, "Tiene una INUNDACIÓN en su casa! Su humedad es de: " + humedad + " %");	
+            }
+          }
+      }
 })
  
 client.on('connect', function () {
-  client.subscribe('presence')
-  //client.publish('presence', 'Hello mqtt')
+  client.subscribe('bot_orders');
+  client.subscribe('dht_values');
 })
 
 bot.on('/help', (data) => {
@@ -61,12 +103,27 @@ bot.on('/help', (data) => {
 	}
 });
 
+bot.on('text', (data) => {
+     var texto = data.text;
+    if(texto != "/temp" && texto != "/help" && texto !="/hum"){
+        bot.sendMessage(id, "Por favor, introduzca uno de los comandos válidos. \n\n" +
+                        "Si su casa está en peligro de incendio o inundación se lo notificaremos automáticamente. \n\n" +
+							"Lista de comandos: \n" +
+							"/temp -> Temperatura actual de su casa \n" +
+							"/hum -> Humedad actual de su casa.");
+    }
+});
 bot.on('/temp', (data) => {
 	if(isRunning == true){
-		client.on('message', function (topic, message) {
+        
+        client.publish('bot_orders', '2d temperatura');
+        client.publish('bot_orders', '1d temperatura');
+        getTemperatura = true;
+        
+		/*client.on('message', function (topic, message) {
 			 var mensaje = message.toString();
 			  var idDisp;
-			  if(mensaje.indexOf('1')) idDisp = 1;
+			  if(mensaje.indexOf('1d')) idDisp = 1;
 			  else idDisp = 2;
 			  bd.getIdTelegram(idDisp,function(err, result){
 				  if(err){
@@ -78,16 +135,20 @@ bot.on('/temp', (data) => {
 					}
 				  }
 			  });
-		});
+		});*/
 	}
 });
 
 bot.on('/hum', (data) => {
 	if(isRunning == true){
-		client.on('message', function (topic, message) {
+        client.publish('bot_orders', '2d humedad');
+        client.publish('bot_orders', '1d humedad');
+        getHumedad = true;
+        
+		/*client.on('message', function (topic, message) {
 			 var mensaje = message.toString();
 			  var idDisp;
-			  if(mensaje.indexOf('1')) idDisp = 1;
+			  if(mensaje.indexOf('1d')) idDisp = 1;
 			  else idDisp = 2;
 			  bd.getIdTelegram(idDisp,function(err, result){
 				  if(err){
@@ -99,14 +160,14 @@ bot.on('/hum', (data) => {
 					}
 				  }
 			  });		
-		});
+		});*/
 	}
 });
 
 function setID(){
 	bot.on('text', (data) => {
 		var texto = data.text;
-		id = data.from.id;
+		var id = data.from.id;
 		if(texto != "" && texto != null && texto != undefined){
 			if(texto == "/start" || texto == "/hi" || texto == "/hello"){
 				isRunning = true;
@@ -136,6 +197,13 @@ function setID(){
 
 function init(){
 	bd.startConnection();
+	bd.getIdsBD(function(err, result){
+		if(err){
+			console.log(err);
+		} else {
+		ids = result;
+		}
+	});
 	setID();
     bot.start();
 }
